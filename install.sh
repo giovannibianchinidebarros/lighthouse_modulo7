@@ -1,6 +1,6 @@
 # Gets where this script (install.sh) is located and define AIRFLOW_HOME
 SOURCE_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)
-export AIRFLOW_HOME=${SOURCE_DIR}/airflow
+export AIRFLOW_HOME=${SOURCE_DIR}/airflow-data
 
 # Install Airflow using the constraints file
 AIRFLOW_VERSION=2.10.2
