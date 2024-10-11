@@ -38,12 +38,23 @@ db_path = os.path.abspath(os.path.join(
 # ========================================================
 # Função para extrair dados da tabela 'Order'
 def extract_orders():
-    conn = sqlite3.connect(db_path)
-    query = "SELECT * FROM [Order];"
-    df = pd.read_sql(query, conn)
-    conn.close()
-    df.to_csv('output_orders.csv', index=False)
-    print("Orders exported to output_orders.csv")
+    """
+    Extrai dados da tabela 'Order' do banco de dados SQLite e exporta para um arquivo CSV.
+    """
+    try:
+        # Estabelece uma conexão com o banco de dados SQLite
+        # Consulta os dados da tabela Order e grave em um DataFrame Pandas
+        with sqlite3.connect(db_path) as conn:
+            query = "SELECT * FROM [Order];"
+            df = pd.read_sql(query, conn)
+        # Exporta o DataFrame para um arquivo CSV
+        df.to_csv('output_orders.csv', index=False)
+        print("Orders exported to output_orders.csv")
+
+    except sqlite3.Error as sql_err:
+        print(f"Database error: {sql_err}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 
 # ========================================================
