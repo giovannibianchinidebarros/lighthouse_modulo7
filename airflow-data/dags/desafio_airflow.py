@@ -1,0 +1,122 @@
+# ========================================================
+# imports:
+from airflow.utils.edgemodifier import Label
+from datetime import datetime, timedelta
+from textwrap import dedent
+from airflow.operators.bash import BashOperator
+from airflow.operators.python import PythonOperator
+from airflow import DAG
+from airflow.models import Variable
+
+import pandas as pd
+import sqlite3
+import os
+
+
+# ========================================================
+# These args will get passed on to each operator
+# You can override them on a per-task basis during operator initialization
+default_args = {
+    'owner': 'airflow',
+    'depends_on_past': False,
+    'email': ['airflow@example.com'],
+    'email_on_failure': True,
+    'email_on_retry': True,
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5),
+}
+
+
+# ========================================================
+# Caminho do diretório onde o DAG está localizado
+dag_directory = os.path.dirname(os.path.abspath(__file__))
+# Caminho correto para o banco de dados, voltando um nível
+db_path = os.path.abspath(os.path.join(
+    dag_directory, '../../data/Northwind_small.sqlite'))
+
+
+# ========================================================
+# Função para extrair dados da tabela 'Order'
+def extract_orders():
+    conn = sqlite3.connect(db_path)
+    query = "SELECT * FROM [Order];"
+    df = pd.read_sql(query, conn)
+    conn.close()
+    df.to_csv('output_orders.csv', index=False)
+    print("Orders exported to output_orders.csv")
+
+
+# ========================================================
+# Função para contar as quantidades vendidas para o Rio de Janeiro
+def count_orders_in_rio():
+    # Lê o arquivo CSV gerado pela tarefa anterior
+    orders_df = pd.read_csv('output_orders.csv')
+    # Renomeia a coluna 'Id' para 'OrderId' para garantir que o merge funcione corretamente
+    orders_df.rename(columns={'Id': 'OrderId'}, inplace=True)
+    # Conectando ao banco de dados para ler a tabela OrderDetail
+    conn = sqlite3.connect(db_path)
+    query = "SELECT * FROM OrderDetail;"
+    order_detail_df = pd.read_sql(query, conn)
+    conn.close()
+    # Fazendo o JOIN entre as duas tabelas
+    # Usando 'OrderId' para o merge
+    merged_df = pd.merge(orders_df, order_detail_df, on='OrderId')
+    # Calculando a soma da quantidade onde o ShipCity é Rio de Janeiro
+    total_quantity = merged_df[merged_df['ShipCity']
+                               == 'Rio de Janeiro']['Quantity'].sum()
+    # Exportando o resultado para count.txt
+    with open('count.txt', 'w') as f:
+        f.write(str(total_quantity))
+    print("Total quantity sold to Rio de Janeiro written to count.txt")
+
+
+## Do not change the code below this line ---------------------!!#
+def export_final_answer():
+    import base64
+
+    # Import count
+    with open('count.txt') as f:
+        count = f.readlines()[0]
+
+    my_email = Variable.get("my_email")
+    message = my_email+count
+    message_bytes = message.encode('ascii')
+    base64_bytes = base64.b64encode(message_bytes)
+    base64_message = base64_bytes.decode('ascii')
+
+    with open("final_output.txt", "w") as f:
+        f.write(base64_message)
+    return None
+## Do not change the code above this line-----------------------##
+
+
+with DAG(
+    'DesafioAirflow',
+    default_args=default_args,
+    description='Desafio de Airflow da Indicium',
+    schedule_interval=timedelta(days=1),
+    start_date=datetime(2021, 1, 1),
+    catchup=False,
+    tags=['example'],
+) as dag:
+    dag.doc_md = """
+        Esse é o desafio de Airflow da Indicium.
+    """
+
+    extract_orders_task = PythonOperator(
+        task_id='extract_orders',
+        python_callable=extract_orders,
+    )
+
+    count_orders_in_rio_task = PythonOperator(
+        task_id='count_orders_in_rio',
+        python_callable=count_orders_in_rio,
+    )
+
+    # export_final_output = PythonOperator(
+    #     task_id='export_final_output',
+    #     python_callable=export_final_answer,
+    #     provide_context=True
+    # )
+
+    extract_orders_task >> count_orders_in_rio_task
