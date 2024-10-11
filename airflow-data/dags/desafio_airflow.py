@@ -60,27 +60,39 @@ def extract_orders():
 # ========================================================
 # Função para contar as quantidades vendidas para o Rio de Janeiro
 def count_orders_in_rio():
-    # Lê o arquivo CSV gerado pela tarefa anterior
-    orders_df = pd.read_csv('output_orders.csv')
-    # Renomeia a coluna 'Id' para 'OrderId' para garantir que o merge funcione corretamente
-    orders_df.rename(columns={'Id': 'OrderId'}, inplace=True)
-    # Conectando ao banco de dados para ler a tabela OrderDetail
-    conn = sqlite3.connect(db_path)
-    query = "SELECT * FROM OrderDetail;"
-    order_detail_df = pd.read_sql(query, conn)
-    conn.close()
-    # Fazendo o JOIN entre as duas tabelas
-    # Usando 'OrderId' para o merge
-    merged_df = pd.merge(orders_df, order_detail_df, on='OrderId')
-    # Calculando a soma da quantidade onde o ShipCity é Rio de Janeiro
-    total_quantity = merged_df[merged_df['ShipCity']
-                               == 'Rio de Janeiro']['Quantity'].sum()
-    # Exportando o resultado para count.txt
-    with open('count.txt', 'w') as f:
-        f.write(str(total_quantity))
-    print("Total quantity sold to Rio de Janeiro written to count.txt")
+    """
+    Lê os dados do arquivo 'output_orders.csv' e faz o JOIN com a tabela 'OrderDetail'
+    do banco de dados SQLite para calcular a quantidade total vendida (Quantity) para 
+    a cidade do Rio de Janeiro. O resultado é salvo no arquivo 'count.txt'.
+    """
+    try:
+        # Lê o arquivo CSV gerado pela tarefa anterior
+        orders_df = pd.read_csv('output_orders.csv')
+        # Renomeia a coluna 'Id' para 'OrderId' para garantir que o merge funcione corretamente
+        orders_df = orders_df.rename(columns={'Id': 'OrderId'})
+        # Conectando ao banco de dados para ler a tabela OrderDetail
+        with sqlite3.connect(db_path) as conn:
+            query = "SELECT * FROM OrderDetail;"
+            order_detail_df = pd.read_sql(query, conn)
+        # Fazendo o JOIN entre as duas tabelas usando 'OrderId'
+        merged_df = pd.merge(orders_df, order_detail_df, on='OrderId')
+        # Calculando a soma da quantidade onde o ShipCity é Rio de Janeiro
+        total_quantity = merged_df[
+            merged_df['ShipCity'] == 'Rio de Janeiro']['Quantity'].sum()
+        # Exportando o resultado para count.txt
+        with open('count.txt', 'w') as f:
+            f.write(str(total_quantity))
+        print("Total quantity sold to Rio de Janeiro written to count.txt")
+
+    except FileNotFoundError as fnf_err:
+        print(f"File error: {fnf_err}")
+    except sqlite3.Error as sql_err:
+        print(f"Database error: {sql_err}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 
+# ========================================================
 ## Do not change the code below this line ---------------------!!#
 def export_final_answer():
     import base64
@@ -101,6 +113,8 @@ def export_final_answer():
 ## Do not change the code above this line-----------------------##
 
 
+# ========================================================
+#
 with DAG(
     'DesafioAirflow',
     default_args=default_args,
