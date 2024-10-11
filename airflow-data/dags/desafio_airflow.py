@@ -1,13 +1,9 @@
 # ========================================================
-# imports:
-from airflow.utils.edgemodifier import Label
-from datetime import datetime, timedelta
-from textwrap import dedent
-from airflow.operators.bash import BashOperator
-from airflow.operators.python import PythonOperator
+# Imports:
 from airflow import DAG
+from airflow.operators.python import PythonOperator
+from datetime import datetime, timedelta
 from airflow.models import Variable
-
 import pandas as pd
 import sqlite3
 import os
@@ -30,9 +26,10 @@ default_args = {
 # ========================================================
 # Caminho do diretório onde o DAG está localizado
 dag_directory = os.path.dirname(os.path.abspath(__file__))
-# Caminho correto para o banco de dados, voltando um nível
-db_path = os.path.abspath(os.path.join(
-    dag_directory, '../../data/Northwind_small.sqlite'))
+# Caminho para o diretório raiz (duas pastas acima do DAG)
+root_directory = os.path.abspath(os.path.join(dag_directory, '../..'))
+# Caminho para o banco de dados
+db_path = os.path.join(root_directory, 'data', 'Northwind_small.sqlite')
 
 
 # ========================================================
@@ -138,10 +135,10 @@ with DAG(
         python_callable=count_orders_in_rio,
     )
 
-    # export_final_output = PythonOperator(
-    #     task_id='export_final_output',
-    #     python_callable=export_final_answer,
-    #     provide_context=True
-    # )
+    export_final_output = PythonOperator(
+        task_id='export_final_output',
+        python_callable=export_final_answer,
+        provide_context=True
+    )
 
-    extract_orders_task >> count_orders_in_rio_task
+    extract_orders_task >> count_orders_in_rio_task >> export_final_output
